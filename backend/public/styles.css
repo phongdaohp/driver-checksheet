@@ -186,3 +186,27 @@ table.report-table th { color: var(--muted); font-weight: 600; }
   text-align: center;
 }
 .toast.show { opacity: 1; }
+
+/* ---- Trạng thái "đang xử lý" cho nút bấm ---- */
+/* Dùng currentColor để vòng quay tự đổi màu theo nút:
+   trắng trên nút .primary nền đỏ, đỏ trên nút .secondary viền đỏ. */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: rrc-spin .6s linear infinite;
+}
+@keyframes rrc-spin { to { transform: rotate(360deg); } }
+
+button:disabled { opacity: .6; cursor: default; }
+
+/* Người dùng bật "giảm chuyển động" thì quay chậm lại thay vì tắt hẳn —
+   vẫn cần thấy là hệ thống đang chạy. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}

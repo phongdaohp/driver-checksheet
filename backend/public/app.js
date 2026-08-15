@@ -63,6 +63,27 @@ function esc(v) {
     .replace(/'/g, '&#39;');
 }
 
+/* Hien trang thai "dang xu ly" ngay tren nut trong luc cho may chu tra loi.
+   Khong co no, nguoi dung bam xong khong thay phan hoi gi va se bam lai nhieu lan --
+   ro nhat khi dung 4G, hoac o lan bam dau tien sau luc ham serverless "nguoi".
+   Nut bi vo hieu hoa trong luc chay nen cung chan luon viec bam trung. */
+async function withBusy(btn, label, fn) {
+  if (!btn || btn.disabled) return;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>' + esc(label);
+  try {
+    return await fn();
+  } finally {
+    // Khi thanh cong, man hinh thuong duoc ve lai nen nut cu da roi khoi DOM.
+    // Chi khoi phuc neu nut van con do (truong hop loi -- de nguoi dung bam lai duoc).
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+}
+
 function fmtDate(d) {
   return d;
 }
@@ -104,13 +125,15 @@ function renderLogin() {
     const password = el('#password').value;
     const errBox = el('#loginError');
     errBox.textContent = '';
-    try {
-      const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
-      saveSession(data.token, data.user);
-      render();
-    } catch (err) {
-      errBox.textContent = err.message;
-    }
+    await withBusy(el('#loginForm button[type="submit"]'), 'Đang đăng nhập…', async () => {
+      try {
+        const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+        saveSession(data.token, data.user);
+        render();
+      } catch (err) {
+        errBox.textContent = err.message;
+      }
+    });
   });
 }
 
@@ -138,17 +161,19 @@ function renderChangePassword(forced) {
     const newPassword = el('#newPassword').value;
     const newPassword2 = el('#newPassword2').value;
     if (newPassword !== newPassword2) { errBox.textContent = 'Mật khẩu nhập lại không khớp'; return; }
-    try {
-      const body = { newPassword };
-      if (!forced) body.oldPassword = el('#oldPassword').value;
-      await api('/auth/change-password', { method: 'POST', body: JSON.stringify(body) });
-      state.user.must_change_password = false;
-      localStorage.setItem('rrc_user', JSON.stringify(state.user));
-      toast('Đổi mật khẩu thành công');
-      render();
-    } catch (err) {
-      errBox.textContent = err.message;
-    }
+    await withBusy(el('#pwForm button[type="submit"]'), 'Đang lưu…', async () => {
+      try {
+        const body = { newPassword };
+        if (!forced) body.oldPassword = el('#oldPassword').value;
+        await api('/auth/change-password', { method: 'POST', body: JSON.stringify(body) });
+        state.user.must_change_password = false;
+        localStorage.setItem('rrc_user', JSON.stringify(state.user));
+        toast('Đổi mật khẩu thành công');
+        render();
+      } catch (err) {
+        errBox.textContent = err.message;
+      }
+    });
   });
   if (!forced) el('#cancelPw').addEventListener('click', render);
 }
@@ -299,27 +324,31 @@ async function renderDriverDaily(main) {
       items.push({ checklist_item_id: Number(c.dataset.itemId), status, note: note || null });
     });
     if (missingNote) { toast('Vui lòng ghi chú rõ vấn đề cho các mục "Có vấn đề"'); return; }
-    try {
-      await api('/checklist/daily', { method: 'POST', body: JSON.stringify({ work_date: todayISO(), day_type: 'driving', items }) });
-      toast('Đã nộp checklist thành công');
-      renderDriverApp();
-    } catch (err) {
-      toast(err.message);
-    }
+    await withBusy(el('#submitDaily'), 'Đang nộp…', async () => {
+      try {
+        await api('/checklist/daily', { method: 'POST', body: JSON.stringify({ work_date: todayISO(), day_type: 'driving', items }) });
+        toast('Đã nộp checklist thành công');
+        renderDriverApp();
+      } catch (err) {
+        toast(err.message);
+      }
+    });
   });
 
   el('#submitNoCarUse').addEventListener('click', async () => {
     const note = el('#noCarNote').value.trim();
-    try {
-      await api('/checklist/daily', {
-        method: 'POST',
-        body: JSON.stringify({ work_date: todayISO(), day_type: 'no_car_use', note: note || null }),
-      });
-      toast('Đã xác nhận hoàn thành - không sử dụng xe');
-      renderDriverApp();
-    } catch (err) {
-      toast(err.message);
-    }
+    await withBusy(el('#submitNoCarUse'), 'Đang gửi…', async () => {
+      try {
+        await api('/checklist/daily', {
+          method: 'POST',
+          body: JSON.stringify({ work_date: todayISO(), day_type: 'no_car_use', note: note || null }),
+        });
+        toast('Đã xác nhận hoàn thành - không sử dụng xe');
+        renderDriverApp();
+      } catch (err) {
+        toast(err.message);
+      }
+    });
   });
 }
 
@@ -343,14 +372,16 @@ async function renderDriverPeriodic(main) {
     `;
     card.querySelector('button').addEventListener('click', async (e) => {
       const note = card.querySelector('.note-input').value.trim();
-      try {
-        await api('/checklist/periodic', {
-          method: 'POST',
-          body: JSON.stringify({ checklist_item_id: item.checklist_item_id, done_date: todayISO(), note: note || null }),
-        });
-        toast('Đã ghi nhận');
-        renderDriverPeriodic(main);
-      } catch (err) { toast(err.message); }
+      await withBusy(e.currentTarget, 'Đang ghi nhận…', async () => {
+        try {
+          await api('/checklist/periodic', {
+            method: 'POST',
+            body: JSON.stringify({ checklist_item_id: item.checklist_item_id, done_date: todayISO(), note: note || null }),
+          });
+          toast('Đã ghi nhận');
+          renderDriverPeriodic(main);
+        } catch (err) { toast(err.message); }
+      });
     });
     list.appendChild(card);
   });
@@ -464,8 +495,9 @@ async function renderAdminSubmissions(main) {
     if (el('#fUser').value) params.set('user_id', el('#fUser').value);
     if (el('#fFrom').value) params.set('from', el('#fFrom').value);
     if (el('#fTo').value) params.set('to', el('#fTo').value);
-    const { submissions } = await api('/admin/submissions?' + params.toString());
     const list = el('#subList');
+    list.innerHTML = '<div class="empty-state"><span class="spinner"></span>Đang tải…</div>';
+    const { submissions } = await api('/admin/submissions?' + params.toString());
     if (submissions.length === 0) { list.innerHTML = '<div class="empty-state">Không có dữ liệu</div>'; return; }
     list.innerHTML = submissions.map(s => {
       const issues = s.items.filter(i => i.status === 'issue');
@@ -554,23 +586,25 @@ async function renderAdminUsers(main) {
     e.preventDefault();
     const errBox = el('#nuError');
     errBox.textContent = '';
-    try {
-      await api('/admin/users', {
-        method: 'POST',
-        body: JSON.stringify({
-          username: el('#nu_username').value.trim(),
-          password: el('#nu_password').value,
-          full_name: el('#nu_fullname').value.trim(),
-          role: el('#nu_role').value,
-          vehicle_plate: el('#nu_plate').value.trim(),
-          vehicle_model: el('#nu_model').value.trim(),
-        }),
-      });
-      toast('Đã tạo tài khoản');
-      renderAdminUsers(main);
-    } catch (err) {
-      errBox.textContent = err.message;
-    }
+    await withBusy(el('#newUserForm button[type="submit"]'), 'Đang tạo…', async () => {
+      try {
+        await api('/admin/users', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: el('#nu_username').value.trim(),
+            password: el('#nu_password').value,
+            full_name: el('#nu_fullname').value.trim(),
+            role: el('#nu_role').value,
+            vehicle_plate: el('#nu_plate').value.trim(),
+            vehicle_model: el('#nu_model').value.trim(),
+          }),
+        });
+        toast('Đã tạo tài khoản');
+        renderAdminUsers(main);
+      } catch (err) {
+        errBox.textContent = err.message;
+      }
+    });
   });
 
   const list = el('#usersList');
@@ -593,21 +627,25 @@ async function renderAdminUsers(main) {
   list.querySelectorAll('[data-action="toggle"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const active = btn.dataset.active === '1' || btn.dataset.active === 'true';
-      try {
-        await api('/admin/users/' + btn.dataset.id, { method: 'PATCH', body: JSON.stringify({ active: !active }) });
-        toast('Đã cập nhật');
-        renderAdminUsers(main);
-      } catch (err) { toast(err.message); }
+      await withBusy(btn, 'Đang cập nhật…', async () => {
+        try {
+          await api('/admin/users/' + btn.dataset.id, { method: 'PATCH', body: JSON.stringify({ active: !active }) });
+          toast('Đã cập nhật');
+          renderAdminUsers(main);
+        } catch (err) { toast(err.message); }
+      });
     });
   });
   list.querySelectorAll('[data-action="reset"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const newPass = prompt('Nhập mật khẩu tạm thời mới (tối thiểu 8 ký tự):');
       if (!newPass) return;
-      try {
-        await api('/admin/users/' + btn.dataset.id, { method: 'PATCH', body: JSON.stringify({ reset_password: newPass }) });
-        toast('Đã đặt lại mật khẩu. Người dùng sẽ phải đổi mật khẩu khi đăng nhập lần tới.');
-      } catch (err) { toast(err.message); }
+      await withBusy(btn, 'Đang đặt lại…', async () => {
+        try {
+          await api('/admin/users/' + btn.dataset.id, { method: 'PATCH', body: JSON.stringify({ reset_password: newPass }) });
+          toast('Đã đặt lại mật khẩu. Người dùng sẽ phải đổi mật khẩu khi đăng nhập lần tới.');
+        } catch (err) { toast(err.message); }
+      });
     });
   });
 }
