@@ -8,6 +8,8 @@ const state = {
   user: JSON.parse(localStorage.getItem('rrc_user') || 'null'),
   driverTab: 'daily',
   adminTab: 'overview',
+  // Bộ lọc mà màn Tổng quan đặt sẵn khi PHC bấm vào số lỗi (dùng một lần)
+  subFilter: null,
 };
 
 function saveSession(token, user) {
@@ -480,26 +482,63 @@ async function renderAdminOverview(main) {
                 : d.day_type === 'no_car_use' ? '<span class="pill warn">Không sử dụng xe</span>'
                 : `<span class="pill yes">${esc(formatTime(d.submitted_at))}</span>`
               }</td>
-              <td>${d.issue_count > 0 ? `<span class="badge-count">${esc(d.issue_count)}</span>` : '-'}</td>
+              <td>${d.issue_count > 0
+                ? `<button type="button" class="badge-count jump-issue" data-user="${esc(d.id)}" data-date="${esc(date)}" title="Bấm để xem chi tiết vấn đề">${esc(d.issue_count)} ⚠</button>`
+                : '-'}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     </div>
   `;
+
+  /* Bấm vào số lỗi -> nhảy thẳng sang tab Báo cáo, đã lọc sẵn đúng lái xe và đúng ngày.
+     Trước đây PHC thấy "2 lỗi" nhưng phải tự sang tab khác rồi tự chọn lại bộ lọc mới
+     biết lỗi gì. */
+  main.querySelectorAll('.jump-issue').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.subFilter = {
+        user_id: btn.dataset.user,
+        from: btn.dataset.date,
+        to: btn.dataset.date,
+      };
+      state.adminTab = 'submissions';
+      renderAdminApp();
+    });
+  });
 }
 
 async function renderAdminSubmissions(main) {
   const { users } = await api('/admin/users');
   const drivers = users.filter(u => u.role === 'driver');
+
+  // Bộ lọc do màn Tổng quan đặt sẵn khi bấm vào số lỗi. Dùng một lần rồi xóa, để lần
+  // sau tự mở tab Báo cáo thì không bị kẹt ở bộ lọc cũ.
+  const preset = state.subFilter;
+  state.subFilter = null;
+
   main.innerHTML = `
     <div class="filters">
       <select id="fUser"><option value="">Tất cả lái xe</option>${drivers.map(d => `<option value="${esc(d.id)}">${esc(d.full_name)}</option>`).join('')}</select>
       <input type="date" id="fFrom">
       <input type="date" id="fTo">
     </div>
+    ${preset ? '<div class="filter-hint" id="filterHint">Đang lọc theo lái xe và ngày đã chọn <button type="button" class="small" id="clearFilter">Xem tất cả</button></div>' : ''}
     <div id="subList"></div>
   `;
+
+  if (preset) {
+    el('#fUser').value = preset.user_id || '';
+    el('#fFrom').value = preset.from || '';
+    el('#fTo').value = preset.to || '';
+    el('#clearFilter').addEventListener('click', () => {
+      el('#fUser').value = '';
+      el('#fFrom').value = '';
+      el('#fTo').value = '';
+      el('#filterHint').remove();
+      load();
+    });
+  }
   async function load() {
     const params = new URLSearchParams();
     if (el('#fUser').value) params.set('user_id', el('#fUser').value);

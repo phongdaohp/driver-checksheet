@@ -210,3 +210,36 @@ button:disabled { opacity: .6; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation-duration: 2.4s; }
 }
+
+/* ---- Bấm vào số lỗi ở Tổng quan để xem chi tiết ---- */
+/* .badge-count giờ là <button> nên phải bỏ giao diện nút mặc định của trình duyệt */
+button.badge-count {
+  border: none;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1.6;
+  transition: transform .1s ease, box-shadow .1s ease;
+}
+button.badge-count:hover,
+button.badge-count:focus-visible {
+  box-shadow: 0 0 0 3px rgba(214, 69, 69, .25);
+  transform: scale(1.06);
+}
+button.badge-count:active { transform: scale(.96); }
+
+/* Dải nhắc khi đang lọc sẵn từ màn Tổng quan */
+.filter-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fdf1f4;
+  border: 1px solid #f0c6d2;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.filter-hint button { flex-shrink: 0; }
