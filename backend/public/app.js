@@ -87,8 +87,18 @@ async function withBusy(btn, label, fn) {
 function fmtDate(d) {
   return d;
 }
+/* Ngày hôm nay theo GIỜ VIỆT NAM (GMT+7), dạng "YYYY-MM-DD".
+   KHÔNG dùng toISOString() — hàm đó trả giờ UTC, chậm hơn 7 tiếng, nên checklist
+   nộp trước 07:00 sáng sẽ bị ghi sang ngày hôm trước. Cũng không dùng giờ máy của
+   điện thoại, vì lái xe có thể đặt sai múi giờ. Xem thêm backend/time.js. */
+const TZ_VN = 'Asia/Ho_Chi_Minh';
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  const p = {};
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ_VN, year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  for (const { type, value } of fmt.formatToParts(new Date())) p[type] = value;
+  return `${p.year}-${p.month}-${p.day}`;
 }
 function daysAgo(dateStr) {
   if (!dateStr) return null;
@@ -96,7 +106,7 @@ function daysAgo(dateStr) {
   const d2 = new Date(todayISO() + 'T00:00:00');
   return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
 }
-// submitted_at is stored as "YYYY-MM-DD HH:MM:SS" (server local/UTC time) -> show HH:MM
+// submitted_at đã được máy chủ quy đổi sẵn sang giờ VN, dạng "YYYY-MM-DD HH:MM:SS" -> lấy HH:MM
 function formatTime(datetimeStr) {
   if (!datetimeStr) return '-';
   const parts = datetimeStr.split(' ');

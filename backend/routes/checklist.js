@@ -1,11 +1,14 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { todayVn } = require('../time');
 
 const router = express.Router();
 
+// Ngày làm việc tính theo GIỜ VIỆT NAM. Dùng toISOString() (giờ UTC) sẽ khiến mọi
+// lần nộp trước 07:00 giờ VN bị xếp nhầm sang hôm trước — xem chi tiết trong time.js.
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return todayVn();
 }
 
 router.get('/items', requireAuth, async (req, res) => {

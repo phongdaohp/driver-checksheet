@@ -240,12 +240,32 @@ Ba điểm **chưa xử lý**, cân nhắc khi có thời gian:
 | Trung bình | Không giới hạn số lần đăng nhập sai | Đếm số lần sai theo tài khoản, lưu ở database (bộ nhớ tiến trình vô dụng trên serverless) |
 | Thấp | `app.use(cors())` mở cho mọi domain | Giới hạn origin đúng tên miền Vercel |
 
-## Giờ hiển thị
+## Múi giờ
 
-Giờ nộp checklist hiển thị theo **UTC** (chậm hơn giờ Việt Nam 7 tiếng) — đây là hành
-vi có từ bản đầu và được giữ nguyên khi chuyển sang Postgres, để tránh lẫn lộn giữa lỗi
-chuyển đổi và thay đổi cố ý. Nếu muốn đổi sang giờ Việt Nam, sửa hàm `toUtcString`
-trong `db.js` (nơi đang quy đổi về UTC) — chỉ một chỗ duy nhất.
+Toàn bộ ngày giờ chạy theo **giờ Việt Nam (GMT+7)**, gom về một chỗ duy nhất:
+`backend/time.js`. Muốn đổi vùng thì sửa hằng `TZ` trong file đó (và `TZ_VN` trong
+`public/app.js` cho phía trình duyệt).
+
+Điều này **không chỉ là chuyện hiển thị**. Bản đầu dùng `toISOString()` (giờ UTC) để
+tính "hôm nay", dẫn tới lỗi nghiêm trọng:
+
+> Lái xe nộp checklist lúc **06:00 sáng 15/08** → UTC là `2026-08-14T23:00Z`
+> → `work_date` bị ghi thành **14/08**, tức hôm trước.
+
+Nghĩa là **mọi lần nộp trước 07:00 giờ VN đều bị xếp nhầm sang hôm trước** — đúng khung
+giờ lái xe kiểm tra xe trước ca sáng. PHC nhìn màn hình tổng quan sẽ thấy "chưa nộp".
+Tệ hơn: bảng `daily_submissions` có ràng buộc `UNIQUE(user_id, work_date)`, nên bản ghi
+sáng nay sẽ **ghi đè lên checklist của hôm qua** — mất dữ liệu.
+
+Đã sửa ở cả 4 nơi: quy đổi `timestamptz` (`db.js`), tính ngày làm việc
+(`routes/checklist.js`), "hôm nay" của báo cáo PHC (`routes/admin.js`), và ngày gửi lên
+từ trình duyệt (`public/app.js`).
+
+Phía trình duyệt cũng chốt cứng vùng `Asia/Ho_Chi_Minh` thay vì lấy giờ máy — lái xe để
+điện thoại sai múi giờ thì vẫn ghi đúng ngày.
+
+⚠️ **Khi thêm code mới, đừng dùng `new Date().toISOString().slice(0,10)` để lấy ngày** —
+đó chính là lỗi trên. Dùng `todayVn()` từ `backend/time.js` (hoặc `todayISO()` ở frontend).
 
 ## Sửa/thêm hạng mục checklist
 

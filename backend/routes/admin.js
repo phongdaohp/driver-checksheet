@@ -2,12 +2,15 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { todayVn } = require('../time');
 
 const router = express.Router();
 router.use(requireAuth, requireAdmin);
 
+// "Hôm nay" của màn hình tổng quan cũng phải theo giờ VN, nếu không PHC mở app
+// trước 07:00 sẽ thấy dữ liệu của hôm trước.
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return todayVn();
 }
 
 router.get('/users', async (req, res) => {

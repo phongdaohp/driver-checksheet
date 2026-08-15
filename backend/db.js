@@ -16,12 +16,11 @@ if (!connectionString) {
    trả về object Date, khi JSON hóa sẽ thành ISO ("...T09:00:00.000Z") làm vỡ cả hai
    hàm đó. Hai dòng dưới giữ nguyên chuỗi thô của Postgres nên frontend không phải sửa. */
 types.setTypeParser(1082, (v) => v);               // date -> "YYYY-MM-DD"
-// timestamptz -> "YYYY-MM-DD HH:MM:SS" theo giờ UTC. Tự quy đổi về UTC thay vì đọc
-// chuỗi thô, để kết quả không phụ thuộc vào timezone mà Postgres đang đặt cho session.
-// Giữ đúng hành vi cũ của SQLite datetime('now') — tức GIỜ UTC, không phải giờ VN.
-const toUtcString = (v) => new Date(v).toISOString().slice(0, 19).replace('T', ' ');
-types.setTypeParser(1184, toUtcString);            // timestamptz
-types.setTypeParser(1114, toUtcString);            // timestamp (phòng khi có cột cũ)
+// timestamptz -> "YYYY-MM-DD HH:MM:SS" theo GIỜ VIỆT NAM (GMT+7). Tự quy đổi thay vì
+// đọc chuỗi thô, để kết quả không phụ thuộc timezone mà Postgres đặt cho session.
+const { toVnDateTime } = require('./time');
+types.setTypeParser(1184, toVnDateTime);           // timestamptz
+types.setTypeParser(1114, toVnDateTime);           // timestamp (phòng khi có cột cũ)
 
 const pool = new Pool({
   connectionString,
